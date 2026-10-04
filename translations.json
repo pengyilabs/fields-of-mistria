@@ -366,7 +366,10 @@
       "gifts_none": "None",
       "gifts_detail_placeholder": "Click a gift to see its details.",
       "gifts_ingredients": "Ingredients",
-      "gifts_birthday": "Birthday"
+      "gifts_birthday": "Birthday",
+      "gifts_occupation": "Occupation",
+      "gifts_gender": "Gender",
+      "gifts_species": "Species"
     }
   },
   "es": {
@@ -736,7 +739,10 @@
       "gifts_none": "Ninguno",
       "gifts_detail_placeholder": "Haz clic en un regalo para ver su detalle.",
       "gifts_ingredients": "Ingredientes",
-      "gifts_birthday": "Cumplea\u00f1os"
+      "gifts_birthday": "Cumplea\u00f1os",
+      "gifts_occupation": "Ocupaci\u00f3n",
+      "gifts_gender": "G\u00e9nero",
+      "gifts_species": "Especie"
     }
   }
 }

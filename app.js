@@ -378,6 +378,85 @@ function renderCharRail() {
   rail.innerHTML = html;
 }
 
+function charHoverHTML(c) {
+  const badge = c.romanceable
+    ? `<span class="rom-badge">\u2661 ${esc(t('gifts_romanceable_badge'))}</span>`
+    : '';
+  const counts = GTIER.map((gt) => {
+    const n = giftItemsFor(c.name, gt.key).length;
+    return `<span class="hc-count ${gt.cls}"><b>${n}</b> ${esc(t('gifts_' + gt.key))}</span>`;
+  }).join('');
+  const rows = [
+    [t('gifts_occupation'), c.occupation],
+    [t('gifts_birthday'), c.birth],
+    [t('gifts_gender'), c.gender],
+    [t('gifts_species'), c.species],
+  ].filter(([, v]) => v)
+    .map(([k, v]) => `<div class="hc-row"><span class="hc-k">${esc(k)}</span><span class="hc-v">${esc(v)}</span></div>`)
+    .join('');
+  return `
+    <div class="hc-top">
+      <div class="hc-port"><img src="${esc(c.portrait)}" alt="${esc(c.name)}"></div>
+      <div class="hc-meta">
+        <div class="hc-name">${esc(c.name)}</div>
+        ${badge}
+      </div>
+    </div>
+    <div class="hc-rows">${rows}</div>
+    <div class="hc-counts">${counts}</div>`;
+}
+
+function showCharHoverCard(name, anchor) {
+  const card = $('#char-hover-card');
+  if (!card) return;
+  const c = GIFTS.characters.find((x) => x.name === name);
+  if (!c) return;
+  card.innerHTML = charHoverHTML(c);
+  card.classList.add('show');
+
+  // measure after the content is in place, then place beside the thumb
+  const pad = 10;
+  const rect = anchor.getBoundingClientRect();
+  const cw = card.offsetWidth;
+  const ch = card.offsetHeight;
+  let left = rect.right + 12;
+  if (left + cw > window.innerWidth - pad) left = rect.left - cw - 12;
+  left = Math.max(pad, left);
+  const top = Math.max(pad, Math.min(rect.top + rect.height / 2 - ch / 2, window.innerHeight - ch - pad));
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+}
+
+function hideCharHoverCard() {
+  const card = $('#char-hover-card');
+  if (card) card.classList.remove('show');
+}
+
+function showGiftHoverCard(itemName, charName, anchor) {
+  const card = $('#gift-hover-card');
+  if (!card) return;
+  card.innerHTML = itemDetailHTML(itemName, charName);
+  card.classList.add('show');
+
+  // measure after the content is in place, then place beside the tile
+  const pad = 10;
+  const rect = anchor.getBoundingClientRect();
+  const cw = card.offsetWidth;
+  const ch = card.offsetHeight;
+  let left = rect.left + rect.width / 2 - cw / 2;
+  left = Math.max(pad, Math.min(left, window.innerWidth - cw - pad));
+  let top = rect.top - ch - 10;
+  if (top < pad) top = rect.bottom + 10;
+  top = Math.max(pad, Math.min(top, window.innerHeight - ch - pad));
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+}
+
+function hideGiftHoverCard() {
+  const card = $('#gift-hover-card');
+  if (card) card.classList.remove('show');
+}
+
 function renderCharHead() {
   const c = GIFTS.characters.find((x) => x.name === state.char);
   if (!c) return;
@@ -423,22 +502,15 @@ function renderGiftGroups() {
   host.innerHTML = html;
 }
 
-function renderItemDetail() {
-  const host = $('#item-detail');
-  const mobile = window.innerWidth <= 900;
-  if (!state.selItem) {
-    host.innerHTML = `<div class="id-empty">${esc(t('gifts_detail_placeholder'))}</div>`;
-    if (mobile) closeModal();
-    return;
-  }
-  const it = GIFTS.items[state.selItem];
-  const gt = itemTier(state.selItem, state.char);
+function itemDetailHTML(itemName, charName) {
+  const it = GIFTS.items[itemName];
+  const gt = itemTier(itemName, charName);
   const tierLabel = gt ? t('gifts_' + gt.key) : '';
   const icon = it && it.icon ? `<img src="${esc(it.icon)}" alt="">` : '<span style="opacity:.4">?</span>';
   const desc = it ? it.desc : '';
 
   // recipe ingredients: look up this item in the recipe index
-  const recipeKey = state.selItem.toLowerCase();
+  const recipeKey = itemName.toLowerCase();
   const recipeData = RECIPES[recipeKey];
   let ingredientsHTML = '';
   if (recipeData && recipeData.ingredients && recipeData.ingredients.length) {
@@ -458,16 +530,27 @@ function renderItemDetail() {
       </div>`;
   }
 
-  const detailHTML = `
+  return `
     <div class="id-top">
       <div class="id-icon">${icon}</div>
       <div>
-        <div class="id-name">${esc(tItem(state.selItem))}</div>
+        <div class="id-name">${esc(tItem(itemName))}</div>
         ${gt ? `<span class="id-tier ${esc(gt.cls)}">${esc(tierLabel)}</span>` : ''}
       </div>
     </div>
     ${desc ? `<p class="id-desc">${esc(desc)}</p>` : ''}
     ${ingredientsHTML}`;
+}
+
+function renderItemDetail() {
+  const host = $('#item-detail');
+  const mobile = window.innerWidth <= 900;
+  if (!state.selItem) {
+    host.innerHTML = `<div class="id-empty">${esc(t('gifts_detail_placeholder'))}</div>`;
+    if (mobile) closeModal();
+    return;
+  }
+  const detailHTML = itemDetailHTML(state.selItem, state.char);
 
   // desktop: inline panel; mobile: bottom-sheet modal
   host.innerHTML = detailHTML;
@@ -509,6 +592,8 @@ function closeModal() {
 /* ---------- main render ---------- */
 
 function render() {
+  hideCharHoverCard();
+  hideGiftHoverCard();
   renderStaticUI();
   renderStats();
 
@@ -582,11 +667,45 @@ function bind() {
     render();
   });
 
+  // desktop-only hover summary for the character rail
+  const charRail = $('#char-rail');
+  charRail.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('.char-thumb');
+    if (!el || window.innerWidth <= 900) return;
+    if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+    showCharHoverCard(el.dataset.char, el);
+  });
+  charRail.addEventListener('mouseout', (e) => {
+    const el = e.target.closest('.char-thumb');
+    if (!el) return;
+    if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+    hideCharHoverCard();
+  });
+  charRail.addEventListener('scroll', hideCharHoverCard);
+  window.addEventListener('resize', () => { hideCharHoverCard(); hideGiftHoverCard(); });
+
+  // desktop-only hover detail for gift tiles (mirrors the right-hand panel)
+  const giftGroups = $('#gift-groups');
+  giftGroups.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('.gift-item');
+    if (!el || window.innerWidth <= 900) return;
+    if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+    showGiftHoverCard(el.dataset.item, state.char, el);
+  });
+  giftGroups.addEventListener('mouseout', (e) => {
+    const el = e.target.closest('.gift-item');
+    if (!el) return;
+    if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+    hideGiftHoverCard();
+  });
+  giftGroups.addEventListener('scroll', hideGiftHoverCard);
+
   // gift item selection
   $('#gift-groups').addEventListener('click', (e) => {
     const el = e.target.closest('.gift-item');
     if (!el) return;
     state.selItem = el.dataset.item;
+    hideGiftHoverCard();
     renderGiftGroups();
     renderItemDetail();
   });
